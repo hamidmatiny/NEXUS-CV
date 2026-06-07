@@ -1,0 +1,38 @@
+FROM python:3.12-slim
+
+LABEL org.opencontainers.image.title="NEXUS-CV Ingestion"
+LABEL org.opencontainers.image.description="Real-time multi-modal CV ingestion pipeline"
+
+RUN groupadd --gid 1000 nexus && \
+    useradd --uid 1000 --gid nexus --shell /bin/bash --create-home nexus
+
+WORKDIR /app
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libgl1 \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender1 && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY config/ config/
+COPY ingestion/ ingestion/
+COPY scripts/ scripts/
+
+RUN mkdir -p /app/data/quarantine /app/models && \
+    chown -R nexus:nexus /app
+
+USER nexus
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python -c "import ray; ray.is_initialized()" || exit 1
+
+CMD ["python", "-m", "ingestion"]

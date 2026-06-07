@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment
+.env
+.venv/
+venv/
+env/
+
+# Data & artifacts
+data/
+models/
+*.pt
+*.engine
+*.onnx
+*.mp4
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Ray
+/tmp/ray/
+ray_results/
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# Docker volumes
+docker-data/

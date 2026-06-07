@@ -1,0 +1,69 @@
+services:
+  ingestion:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ingestion
+    env_file:
+      - .env
+    environment:
+      - QUARANTINE_DIR=/app/data/quarantine
+      - YOLO_MODEL_PATH=/app/models/${YOLO_MODEL_PATH:-yolo11n.pt}
+    volumes:
+      - ./data/quarantine:/app/data/quarantine
+      - ./models:/app/models
+    ports:
+      - "8265:8265"
+    networks:
+      - nexus-net
+    restart: unless-stopped
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.18.0
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:///mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-data:/mlflow
+    networks:
+      - nexus-net
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - nexus-net
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - nexus-net
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+volumes:
+  mlflow-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  nexus-net:
+    driver: bridge
