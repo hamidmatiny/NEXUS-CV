@@ -3,17 +3,23 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import asyncio
 import logging
 import os
 import signal
-import sys
+import time
 from typing import TYPE_CHECKING
 
 import ray
 import structlog
 
 from config.settings import get_settings
+from ingestion import metrics
 from ingestion.frame_buffer_actor import FrameBufferActor
 from ingestion.schema_contracts import validate_detections
 from ingestion.stream_capture import StreamCapture
@@ -100,9 +106,21 @@ async def run_camera_pipeline(
                 break
 
             try:
+                infer_start = time.perf_counter()
                 async with detect_lock:
                     batch_results = await asyncio.to_thread(detector.detect_batch, [packet.frame])
+                detection_latency_ms = (time.perf_counter() - infer_start) * 1000.0
                 detections = batch_results[0]
+
+                metrics.FRAMES_PROCESSED.labels(camera_id=camera_id).inc()
+                metrics.INFERENCE_DURATION_MS.labels(camera_id=camera_id).observe(
+                    detection_latency_ms
+                )
+                for det in detections:
+                    metrics.DETECTIONS_TOTAL.labels(
+                        camera_id=camera_id,
+                        class_name=det.class_name,
+                    ).inc()
 
                 validation = await asyncio.to_thread(
                     validate_detections,
@@ -112,6 +130,7 @@ async def run_camera_pipeline(
                 )
                 if validation.failed > 0:
                     quarantine_total += validation.failed
+                    metrics.QUARANTINE_TOTAL.labels(camera_id=camera_id).inc(validation.failed)
 
                 detections_total += len(detections)
                 await asyncio.to_thread(
@@ -172,6 +191,8 @@ async def main() -> None:
 
     buffer_actor = FrameBufferActor.options(name=FRAME_BUFFER_ACTOR_NAME).remote()
 
+    metrics.ACTIVE_CAMERAS.set(settings.NUM_CAMERAS)
+
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     detector = YOLODetector()
@@ -207,11 +228,13 @@ async def main() -> None:
     except asyncio.CancelledError:
         pass
 
+    metrics.ACTIVE_CAMERAS.set(0)
     ray.shutdown()
     logger.info("ingestion_shutdown_complete")
 
 
 if __name__ == "__main__":
+    metrics.start_metrics_server(port=8001)
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

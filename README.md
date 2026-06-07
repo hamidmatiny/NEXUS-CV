@@ -28,6 +28,7 @@ Architecture decisions are documented in [ADR.md](ADR.md).
 ```
 nexus-cv/
 ├── ingestion/          # Stream capture, YOLO detection, Ray frame buffer
+├── fusion/             # Multi-modal sensor fusion engine (Phase 2)
 ├── config/             # pydantic-settings configuration
 ├── tests/              # Unit tests (CPU-only, mocked YOLO)
 ├── scripts/            # Synthetic stream generator for CI/dev
@@ -79,7 +80,7 @@ python scripts/generate_synthetic_streams.py --num-cameras 4 --fps 15 --duration
 | Phase | Description | Status |
 |-------|-------------|--------|
 | **1** | Ingestion pipeline: stream capture, YOLO detection, frame buffer, schema validation | ✅ Complete |
-| 2 | Multi-modal fusion (audio, metadata enrichment) | 🔲 Planned |
+| **2** | Multi-modal fusion: Kalman tracking, sensor alignment, LiDAR/radar simulators, FusionActor | ✅ Complete |
 | 3 | Real-time alerting and event bus | 🔲 Planned |
 | 4 | Edge deployment and TensorRT optimization | 🔲 Planned |
 | 5 | Production hardening (auth, multi-tenancy) | 🔲 Planned |

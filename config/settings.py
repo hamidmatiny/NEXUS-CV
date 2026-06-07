@@ -40,6 +40,14 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = Field(default="INFO", description="Logging level for structlog")
     RAY_NUM_CPUS: int = Field(default=4, description="CPUs allocated to Ray cluster")
     RAY_NUM_GPUS: float = Field(default=0.0, description="GPUs allocated to Ray cluster")
+    FUSION_ALIGNMENT_MAX_OFFSET_MS: float = Field(
+        default=50.0,
+        description="Max inter-sensor timestamp gap for temporal alignment",
+    )
+    FUSION_ALIGNMENT_BUFFER_SIZE: int = Field(
+        default=50,
+        description="Sliding buffer size per sensor modality",
+    )
 
 
 @lru_cache

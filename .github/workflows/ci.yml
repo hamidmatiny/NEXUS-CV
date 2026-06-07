@@ -27,13 +27,13 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Ruff
-        run: ruff check config ingestion tests scripts
+        run: ruff check config ingestion fusion tests scripts
 
       - name: Black
-        run: black --check config ingestion tests scripts
+        run: black --check config ingestion fusion tests scripts
 
       - name: Mypy
-        run: mypy config ingestion
+        run: mypy config ingestion fusion
 
   test:
     runs-on: ubuntu-latest
