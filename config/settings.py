@@ -52,6 +52,42 @@ class Settings(BaseSettings):
         default="./models/trajectory_lstm.pt",
         description="Path to trained TrajectoryLSTM checkpoint",
     )
+    MLFLOW_TRACKING_URI: str = Field(
+        default="http://localhost:5001",
+        description="MLflow tracking server URI",
+    )
+    MLFLOW_REGISTRY_ENABLED: bool = Field(
+        default=False,
+        description="Resolve production models from MLflow Model Registry at startup",
+    )
+    MODEL_CACHE_DIR: Path = Field(
+        default=Path("./models/cache"),
+        description="Local cache directory for registry-downloaded models",
+    )
+    MLOPS_RETRAINING_ENABLED: bool = Field(
+        default=False,
+        description="Enable scheduled drift evaluation from the serving layer",
+    )
+    MLOPS_REFERENCE_DATA_PATH: Path = Field(
+        default=Path("./data/reference/detections.parquet"),
+        description="Reference parquet dataset for drift monitoring",
+    )
+    MLOPS_DATASET_DRIFT_THRESHOLD: float = Field(
+        default=0.3,
+        description="Share of drifted features that triggers retraining",
+    )
+    MLOPS_EMBEDDING_DRIFT_THRESHOLD: float = Field(
+        default=0.15,
+        description="Embedding cosine drift score threshold",
+    )
+    MLOPS_MIN_HOURS_BETWEEN_RETRAINING: int = Field(
+        default=6,
+        description="Minimum hours between automated retraining triggers",
+    )
+    MLOPS_RETRAINING_WEBHOOK_URL: str | None = Field(
+        default=None,
+        description="Optional webhook URL for retraining notifications",
+    )
 
 
 @lru_cache

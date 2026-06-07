@@ -77,7 +77,9 @@ class DetectionDeployment:
 
     def __init__(self) -> None:
         """Initialize the YOLO detector."""
-        self._detector = YOLODetector()
+        from serving.model_loader import resolve_yolo_model_path
+
+        self._detector = YOLODetector(model_path=resolve_yolo_model_path())
         logger.info("detection_deployment_initialized")
 
     async def __call__(self, request: InferenceRequest) -> PipelineResult:
@@ -222,8 +224,14 @@ class IntelligenceDeployment:
 
     def __init__(self) -> None:
         """Initialize the intelligence ensemble."""
-        self._ensemble = IntelligenceEnsemble()
-        logger.info("intelligence_deployment_initialized")
+        from intelligence.trajectory_lstm import TrajectoryPredictor
+        from serving.model_loader import resolve_lstm_model_path
+
+        lstm_path = resolve_lstm_model_path()
+        self._ensemble = IntelligenceEnsemble(
+            trajectory_predictor=TrajectoryPredictor(model_path=lstm_path),
+        )
+        logger.info("intelligence_deployment_initialized", lstm_path=lstm_path)
 
     async def __call__(self, partial: PipelineResult) -> PipelineResult:
         """Run scene classification, trajectory, and anomaly scoring.

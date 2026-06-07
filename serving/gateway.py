@@ -55,6 +55,10 @@ async def _run_pipeline(request: InferenceRequest) -> InferenceResponse:
     serving_ms = (time.perf_counter() - start) * 1000.0
     inference_ms = result.inference_ms
 
+    from serving.mlops_scheduler import get_mlops_scheduler
+
+    get_mlops_scheduler().record_frame(result)
+
     if inference_ms > SLA_THRESHOLD_MS:
         SLA_BREACH_TOTAL.inc()
         logger.warning(
