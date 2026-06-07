@@ -85,8 +85,11 @@ class NexusExperimentTracker:
         """
         import mlflow
 
+        from mlops.mlflow_utils import wait_for_mlflow
+
         if tracking_uri:
             mlflow.set_tracking_uri(tracking_uri)
+            wait_for_mlflow(tracking_uri)
         mlflow.set_experiment(experiment_name)
         self._experiment_name = experiment_name
         logger.info("experiment_tracker_initialized", experiment=experiment_name)

@@ -2,6 +2,7 @@
 
 from mlops.drift_monitor import DriftMonitor, DriftReport, KSDriftResult
 from mlops.experiment_tracker import NexusExperimentTracker
+from mlops.mlflow_utils import log_service_startup, wait_for_mlflow
 from mlops.model_registry import ModelInfo, ModelRegistry, ModelVersion, RegisteredModel
 from mlops.retraining_orchestrator import (
     RetrainingConfig,
@@ -13,6 +14,7 @@ __all__ = [
     "DriftMonitor",
     "DriftReport",
     "KSDriftResult",
+    "log_service_startup",
     "ModelInfo",
     "ModelRegistry",
     "ModelVersion",
@@ -21,4 +23,5 @@ __all__ = [
     "RetrainingConfig",
     "RetrainingDecision",
     "RetrainingOrchestrator",
+    "wait_for_mlflow",
 ]

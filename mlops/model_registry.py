@@ -59,10 +59,13 @@ class ModelRegistry:
         """
         from mlflow.tracking import MlflowClient
 
+        from mlops.mlflow_utils import wait_for_mlflow
+
         if tracking_uri:
             import mlflow
 
             mlflow.set_tracking_uri(tracking_uri)
+            wait_for_mlflow(tracking_uri)
         self._client = MlflowClient()
         logger.info("model_registry_initialized")
 

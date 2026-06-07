@@ -362,7 +362,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum by (le, camera_id) (rate(nexus_cv_inference_duration_ms_bucket[1m])))",
+          "expr": "histogram_quantile(0.50, sum by (le, camera_id) (rate(nexus_cv_yolo_inference_duration_ms_bucket[1m])))",
           "legendFormat": "p50 {{camera_id}}",
           "range": true,
           "refId": "A"
@@ -373,7 +373,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le, camera_id) (rate(nexus_cv_inference_duration_ms_bucket[1m])))",
+          "expr": "histogram_quantile(0.95, sum by (le, camera_id) (rate(nexus_cv_yolo_inference_duration_ms_bucket[1m])))",
           "legendFormat": "p95 {{camera_id}}",
           "range": true,
           "refId": "B"
@@ -384,7 +384,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum by (le, camera_id) (rate(nexus_cv_inference_duration_ms_bucket[1m])))",
+          "expr": "histogram_quantile(0.99, sum by (le, camera_id) (rate(nexus_cv_yolo_inference_duration_ms_bucket[1m])))",
           "legendFormat": "p99 {{camera_id}}",
           "range": true,
           "refId": "C"

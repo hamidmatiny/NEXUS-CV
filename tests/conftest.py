@@ -57,6 +57,8 @@ def _override_settings(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr("ingestion.yolo_detector.get_settings", lambda: settings)
     monkeypatch.setattr("ingestion.schema_contracts.get_settings", lambda: settings)
     monkeypatch.setattr("serving.health.get_settings", lambda: settings)
+    monkeypatch.setattr("mlops.mlflow_utils.wait_for_mlflow", lambda *a, **k: True)
+    monkeypatch.setattr("serving.mlops_background.wait_for_mlflow", lambda *a, **k: True)
 
 
 @pytest.fixture

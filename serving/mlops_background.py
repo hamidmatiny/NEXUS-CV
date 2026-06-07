@@ -10,6 +10,7 @@ from typing import Any
 import structlog
 
 from config.settings import get_settings
+from mlops.mlflow_utils import wait_for_mlflow
 from serving.mlops_scheduler import TIME_CHECK_INTERVAL_S, get_mlops_scheduler, reset_mlops_scheduler
 
 logger = structlog.get_logger(__name__)
@@ -71,6 +72,8 @@ async def stop_background_orchestrator() -> None:
 @asynccontextmanager
 async def mlops_lifespan(_app: Any) -> AsyncIterator[None]:
     """FastAPI lifespan context managing the MLOps background orchestrator."""
+    settings = get_settings()
+    wait_for_mlflow(settings.MLFLOW_TRACKING_URI)
     start_background_orchestrator()
     yield
     await stop_background_orchestrator()

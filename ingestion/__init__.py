@@ -1,5 +1,6 @@
 """Ingestion pipeline package for NEXUS-CV."""
 
+from ingestion.app import app as metrics_app
 from ingestion.frame_buffer_actor import BufferedFrame, FrameBufferActor
 from ingestion.schema_contracts import ValidationResult, validate_detections
 from ingestion.stream_capture import FramePacket, StreamCapture
@@ -13,5 +14,6 @@ __all__ = [
     "StreamCapture",
     "ValidationResult",
     "YOLODetector",
+    "metrics_app",
     "validate_detections",
 ]

@@ -24,6 +24,7 @@ from ingestion.frame_buffer_actor import FrameBufferActor
 from ingestion.schema_contracts import validate_detections
 from ingestion.stream_capture import StreamCapture
 from ingestion.yolo_detector import YOLODetector
+from mlops.mlflow_utils import log_service_startup
 
 if TYPE_CHECKING:
     import ray.actor
@@ -171,6 +172,16 @@ async def main() -> None:
     _configure_logging(settings.LOG_LEVEL)
     heartbeat_interval = _heartbeat_interval()
 
+    metrics.start_metrics_server(host="0.0.0.0", port=8000)
+    log_service_startup(
+        settings.MLFLOW_TRACKING_URI,
+        service="ingestion",
+        params={
+            "num_cameras": settings.NUM_CAMERAS,
+            "yolo_model": settings.YOLO_MODEL_PATH,
+        },
+    )
+
     logger.info(
         "ingestion_service_ready",
         num_cameras=settings.NUM_CAMERAS,
@@ -234,7 +245,6 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    metrics.start_metrics_server(port=8001)
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
