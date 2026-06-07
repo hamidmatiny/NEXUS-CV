@@ -81,7 +81,8 @@ python scripts/generate_synthetic_streams.py --num-cameras 4 --fps 15 --duration
 |-------|-------------|--------|
 | **1** | Ingestion pipeline: stream capture, YOLO detection, frame buffer, schema validation | ✅ Complete |
 | **2** | Multi-modal fusion: Kalman tracking, sensor alignment, LiDAR/radar simulators, FusionActor | ✅ Complete |
-| 3 | Real-time alerting and event bus | 🔲 Planned |
+| **3** | Stacked AI intelligence: scene classification, trajectory LSTM, anomaly scoring, ensemble | ✅ Complete |
+| 4 | Real-time alerting and event bus | 🔲 Planned |
 | 4 | Edge deployment and TensorRT optimization | 🔲 Planned |
 | 5 | Production hardening (auth, multi-tenancy) | 🔲 Planned |
 

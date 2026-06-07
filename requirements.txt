@@ -11,3 +11,8 @@ pandas==2.2.3
 multimethod==1.12
 scipy==1.14.1
 prometheus_client==0.21.1
+transformers==4.46.3
+mlflow==2.18.0
+onnx==1.17.0
+mlflow==2.18.0
+onnx==1.17.0

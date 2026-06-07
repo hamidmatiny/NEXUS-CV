@@ -48,6 +48,10 @@ class Settings(BaseSettings):
         default=50,
         description="Sliding buffer size per sensor modality",
     )
+    TRAJECTORY_LSTM_PATH: str = Field(
+        default="./models/trajectory_lstm.pt",
+        description="Path to trained TrajectoryLSTM checkpoint",
+    )
 
 
 @lru_cache
