@@ -72,6 +72,14 @@ class Settings(BaseSettings):
         default=Path("./data/reference/detections.parquet"),
         description="Reference parquet dataset for drift monitoring",
     )
+    MLOPS_REPORTS_DIR: Path = Field(
+        default=Path("./reports"),
+        description="Directory for Evidently HTML drift reports",
+    )
+    MLOPS_TEMP_DATA_DIR: Path = Field(
+        default=Path("./data/mlops/current"),
+        description="Directory for operational inference window parquet snapshots",
+    )
     MLOPS_DATASET_DRIFT_THRESHOLD: float = Field(
         default=0.3,
         description="Share of drifted features that triggers retraining",

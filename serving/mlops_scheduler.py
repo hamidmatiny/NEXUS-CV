@@ -1,4 +1,4 @@
-"""Scheduled MLOps drift evaluation from the serving layer."""
+"""Scheduled MLOps drift evaluation and automated retraining from the serving layer."""
 
 from __future__ import annotations
 
@@ -8,10 +8,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import pandas as pd
 import structlog
 
 from config.settings import get_settings
+from mlops.drift_workflow import (
+    DETECTION_FEATURE_COLUMNS,
+    build_detection_dataframe,
+    dump_operational_parquet,
+    run_drift_check,
+)
 
 if TYPE_CHECKING:
     from mlops.retraining_orchestrator import RetrainingDecision, RetrainingOrchestrator
@@ -46,7 +51,23 @@ class MLOpsScheduler:
         self._frame_count = 0
         self._last_check_monotonic = time.monotonic()
         self._observations = ServingObservation()
-        self._enabled = get_settings().MLOPS_RETRAINING_ENABLED
+        self._settings = get_settings()
+        self._enabled = self._settings.MLOPS_RETRAINING_ENABLED
+
+        if self._enabled:
+            logger.info(
+                "mlops_scheduler_enabled",
+                reference_data=str(self._settings.MLOPS_REFERENCE_DATA_PATH),
+                reports_dir=str(self._settings.MLOPS_REPORTS_DIR),
+                mlflow_uri=self._settings.MLFLOW_TRACKING_URI,
+            )
+        else:
+            logger.debug("mlops_scheduler_disabled")
+
+    @property
+    def enabled(self) -> bool:
+        """Return whether automated retraining is enabled."""
+        return self._enabled
 
     def record_frame(self, pipeline_result: Any) -> RetrainingDecision | None:
         """Record a pipeline result and evaluate drift if thresholds are met.
@@ -63,13 +84,35 @@ class MLOpsScheduler:
         self._frame_count += 1
         self._accumulate(pipeline_result)
 
-        elapsed = time.monotonic() - self._last_check_monotonic
-        if self._frame_count < FRAME_CHECK_INTERVAL and elapsed < TIME_CHECK_INTERVAL_S:
+        if not self._should_run_evaluation():
             return None
 
-        self._frame_count = 0
-        self._last_check_monotonic = time.monotonic()
-        return self._evaluate()
+        return self._run_evaluation_window(trigger="frame_or_time_threshold")
+
+    def check_time_based(self) -> RetrainingDecision | None:
+        """Evaluate drift when the hourly interval elapses (background loop).
+
+        Returns:
+            RetrainingDecision if evaluation ran, else None.
+        """
+        if not self._enabled:
+            return None
+
+        elapsed = time.monotonic() - self._last_check_monotonic
+        if elapsed < TIME_CHECK_INTERVAL_S:
+            return None
+
+        if not self._observations.confidences:
+            self._last_check_monotonic = time.monotonic()
+            logger.debug("mlops_hourly_skip_no_observations")
+            return None
+
+        return self._run_evaluation_window(trigger="hourly_background")
+
+    def _should_run_evaluation(self) -> bool:
+        """Return True when frame count or elapsed time thresholds are met."""
+        elapsed = time.monotonic() - self._last_check_monotonic
+        return self._frame_count >= FRAME_CHECK_INTERVAL or elapsed >= TIME_CHECK_INTERVAL_S
 
     def _accumulate(self, result: Any) -> None:
         """Append detection and track stats from a pipeline result.
@@ -87,37 +130,77 @@ class MLOpsScheduler:
             vx, vy = track.velocity_2d
             self._observations.velocities.append(float(np.hypot(vx, vy)))
 
-    def _evaluate(self) -> RetrainingDecision | None:
-        """Run drift evaluation with accumulated observations.
+    def _run_evaluation_window(self, trigger: str) -> RetrainingDecision | None:
+        """Dump operational window, run drift check, and optionally trigger retraining.
+
+        Args:
+            trigger: Human-readable trigger reason for logging.
 
         Returns:
-            RetrainingDecision or None if orchestrator unavailable.
+            RetrainingDecision or None if evaluation could not complete.
         """
-        orchestrator = self._orchestrator or _build_orchestrator()
-        if orchestrator is None:
-            return None
+        self._frame_count = 0
+        self._last_check_monotonic = time.monotonic()
 
         obs = self._observations
         if not obs.confidences:
-            logger.debug("mlops_skip_empty_observations")
+            logger.debug("mlops_skip_empty_observations", trigger=trigger)
             return None
 
-        detection_data = pd.DataFrame(
-            {
-                "confidence": obs.confidences,
-                "bbox_area": obs.bbox_areas,
-                "class_id": obs.class_ids,
-            }
+        reference_path = Path(self._settings.MLOPS_REFERENCE_DATA_PATH)
+        if not reference_path.exists():
+            logger.warning("mlops_reference_data_missing", path=str(reference_path))
+            return None
+
+        detection_data = build_detection_dataframe(
+            obs.confidences,
+            obs.bbox_areas,
+            obs.class_ids,
+            obs.velocities or None,
         )
+        current_path = dump_operational_parquet(detection_data, self._settings.MLOPS_TEMP_DATA_DIR)
+
+        drift_check = run_drift_check(
+            reference_path=reference_path,
+            current_data=detection_data,
+            reports_dir=self._settings.MLOPS_REPORTS_DIR,
+            dataset_drift_threshold=self._settings.MLOPS_DATASET_DRIFT_THRESHOLD,
+            feature_columns=DETECTION_FEATURE_COLUMNS,
+            current_data_path=current_path,
+        )
+
         if obs.embeddings:
             embeddings = np.array(obs.embeddings, dtype=np.float32)
         else:
-            embeddings = np.zeros((1, 8))
-        velocities = np.array(obs.velocities, dtype=np.float32) if obs.velocities else np.zeros(1)
+            embeddings = np.zeros((1, 8), dtype=np.float32)
+        velocities = (
+            np.array(obs.velocities, dtype=np.float32) if obs.velocities else np.zeros(1)
+        )
 
-        decision = orchestrator.evaluate_and_trigger(detection_data, embeddings, velocities)
+        orchestrator = self._orchestrator or _build_orchestrator()
+        if orchestrator is None:
+            logger.warning("mlops_orchestrator_unavailable")
+            self._observations = ServingObservation()
+            return None
+
+        decision = orchestrator.evaluate_from_drift_check(
+            drift_check=drift_check,
+            embeddings=embeddings,
+            velocities=velocities,
+        )
         self._observations = ServingObservation()
-        logger.info("mlops_scheduled_evaluation", should_retrain=decision.should_retrain)
+
+        logger.info(
+            "mlops_scheduled_evaluation_complete",
+            trigger=trigger,
+            should_retrain=decision.should_retrain,
+            dataset_drift=decision.dataset_drift,
+            drift_exit_code=drift_check.exit_code,
+            drift_report_path=str(decision.drift_report_path)
+            if decision.drift_report_path
+            else None,
+            mlflow_run_id=decision.mlflow_run_id,
+        )
         return decision
 
 
@@ -151,7 +234,6 @@ def _build_orchestrator() -> RetrainingOrchestrator | None:
     settings = get_settings()
     ref_path = Path(settings.MLOPS_REFERENCE_DATA_PATH)
     if not ref_path.exists():
-        logger.debug("mlops_reference_data_missing", path=str(ref_path))
         return None
 
     try:
@@ -162,7 +244,9 @@ def _build_orchestrator() -> RetrainingOrchestrator | None:
 
         monitor = DriftMonitor(
             reference_dataset_path=ref_path,
-            feature_columns=["confidence", "bbox_area", "class_id"],
+            feature_columns=DETECTION_FEATURE_COLUMNS,
+            reports_dir=settings.MLOPS_REPORTS_DIR,
+            dataset_drift_threshold=settings.MLOPS_DATASET_DRIFT_THRESHOLD,
         )
         tracker = NexusExperimentTracker(tracking_uri=settings.MLFLOW_TRACKING_URI)
         registry = ModelRegistry(tracking_uri=settings.MLFLOW_TRACKING_URI)

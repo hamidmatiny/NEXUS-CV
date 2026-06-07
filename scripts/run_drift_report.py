@@ -12,11 +12,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pandas as pd
 import structlog
 
-from mlops.drift_monitor import DriftMonitor
+from mlops.drift_workflow import (
+    DETECTION_FEATURE_COLUMNS,
+    print_drift_summary,
+    run_drift_check,
+)
 
 logger = structlog.get_logger(__name__)
-
-FEATURE_COLUMNS = ["confidence", "bbox_area", "class_id"]
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -47,31 +49,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=Path("reports"),
         help="Directory for HTML drift reports",
     )
+    parser.add_argument(
+        "--drift-threshold",
+        type=float,
+        default=0.3,
+        help="Share of drifted features constituting dataset drift",
+    )
     return parser.parse_args(argv)
-
-
-def _print_summary(report: object) -> None:
-    """Print drift summary table to stdout.
-
-    Args:
-        report: DriftReport instance.
-    """
-    from mlops.drift_monitor import DriftReport
-
-    assert isinstance(report, DriftReport)
-    print("\n=== Drift Report Summary ===")
-    print(f"{'Metric':<24} {'Value'}")
-    print("-" * 40)
-    print(f"{'Drifted features':<24} {report.n_drifted_features}")
-    print(f"{'Share drifted':<24} {report.share_drifted:.3f}")
-    print(f"{'Dataset drift':<24} {report.dataset_drift}")
-    print(f"{'Report path':<24} {report.report_path}")
-    print("\nPer-feature:")
-    for name, details in report.feature_reports.items():
-        drifted = details.get("drifted", False)
-        ref_mean = details.get("reference_mean")
-        cur_mean = details.get("current_mean")
-        print(f"  {name}: drifted={drifted}, ref_mean={ref_mean}, cur_mean={cur_mean}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -86,17 +70,23 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     current_data = pd.read_parquet(args.current_data)
 
-    monitor = DriftMonitor(
-        reference_dataset_path=args.reference_data,
-        feature_columns=FEATURE_COLUMNS,
+    result = run_drift_check(
+        reference_path=args.reference_data,
+        current_data=current_data,
         reports_dir=args.output_dir,
+        dataset_drift_threshold=args.drift_threshold,
+        feature_columns=DETECTION_FEATURE_COLUMNS,
+        current_data_path=args.current_data,
     )
-    report = monitor.run_detection_drift_report(current_data)
-    _print_summary(report)
+    print_drift_summary(result.report)
 
-    if report.dataset_drift:
-        logger.warning("dataset_drift_detected", share_drifted=report.share_drifted)
-        return 1
+    if result.dataset_drift:
+        logger.warning(
+            "dataset_drift_detected",
+            share_drifted=result.report.share_drifted,
+            report_path=str(result.report.report_path),
+        )
+        return result.exit_code
     return 0
 
 

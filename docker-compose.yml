@@ -8,9 +8,16 @@ services:
     environment:
       - QUARANTINE_DIR=/app/data/quarantine
       - YOLO_MODEL_PATH=/app/models/${YOLO_MODEL_PATH:-yolo11n.pt}
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - MLOPS_REPORTS_DIR=/app/reports
+      - MLOPS_TEMP_DATA_DIR=/app/data/mlops/current
+      - MLOPS_REFERENCE_DATA_PATH=/app/data/reference/detections.parquet
     volumes:
       - ./data/quarantine:/app/data/quarantine
       - ./models:/app/models
+      - ./reports:/app/reports
+      - ./data/reference:/app/data/reference:ro
+      - ./data/mlops:/app/data/mlops
     ports:
       - "8265:8265"
       - "8001:8001"

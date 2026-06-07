@@ -24,7 +24,7 @@ COPY config/ config/
 COPY ingestion/ ingestion/
 COPY scripts/ scripts/
 
-RUN mkdir -p /app/data/quarantine /app/models && \
+RUN mkdir -p /app/data/quarantine /app/models /app/reports /app/data/mlops/current /app/data/reference && \
     chown -R nexus:nexus /app
 
 USER nexus

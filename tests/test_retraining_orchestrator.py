@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 
 from mlops.drift_monitor import DriftReport, KSDriftResult
+from mlops.drift_workflow import DriftCheckResult
 from mlops.retraining_orchestrator import RetrainingConfig, RetrainingOrchestrator
 
 DETECTION_DF = pd.DataFrame({"confidence": [0.5], "bbox_area": [100.0], "class_id": [0]})
@@ -38,9 +39,15 @@ def mock_drift_monitor() -> MagicMock:
 @pytest.fixture
 def orchestrator(mock_drift_monitor: MagicMock) -> RetrainingOrchestrator:
     """Build a RetrainingOrchestrator with mocked dependencies."""
+    mock_tracker = MagicMock()
+    mock_run = MagicMock()
+    mock_run.run_id = "run-test"
+    mock_tracker.start_run.return_value.__enter__ = MagicMock(return_value=mock_run)
+    mock_tracker.start_run.return_value.__exit__ = MagicMock(return_value=None)
+
     return RetrainingOrchestrator(
         drift_monitor=mock_drift_monitor,
-        experiment_tracker=MagicMock(),
+        experiment_tracker=mock_tracker,
         model_registry=MagicMock(),
         config=RetrainingConfig(
             dataset_drift_threshold=0.3,
@@ -52,6 +59,23 @@ def orchestrator(mock_drift_monitor: MagicMock) -> RetrainingOrchestrator:
     )
 
 
+def _drift_check_result() -> DriftCheckResult:
+    """Build a drift check result indicating dataset drift."""
+    from mlops.drift_workflow import DriftCheckResult
+
+    return DriftCheckResult(
+        report=DriftReport(
+            n_drifted_features=2,
+            share_drifted=0.67,
+            dataset_drift=True,
+            feature_reports={"confidence": {"drifted": True}},
+            report_path=Path("reports/drift_test.html"),
+        ),
+        exit_code=1,
+        current_data_path=Path("data/mlops/current/current_test.parquet"),
+    )
+
+
 @pytest.mark.unit
 def test_evaluate_and_trigger_when_drift_detected(orchestrator: RetrainingOrchestrator) -> None:
     """Drift above threshold triggers retraining."""
@@ -60,6 +84,7 @@ def test_evaluate_and_trigger_when_drift_detected(orchestrator: RetrainingOrches
             detection_data=DETECTION_DF,
             embeddings=np.ones((5, 8)),
             velocities=np.array([1.0, 2.0]),
+            drift_check=_drift_check_result(),
         )
 
     assert decision.should_retrain
@@ -78,6 +103,7 @@ def test_evaluate_respects_cooldown(orchestrator: RetrainingOrchestrator) -> Non
             detection_data=DETECTION_DF,
             embeddings=np.ones((5, 8)),
             velocities=np.array([1.0]),
+            drift_check=_drift_check_result(),
         )
 
     assert not decision.should_retrain
@@ -93,9 +119,15 @@ def test_trigger_retraining_local_script(tmp_path: Path) -> None:
     script = tmp_path / "train_trajectory_lstm.py"
     script.write_text("# stub")
 
+    mock_tracker = MagicMock()
+    mock_run = MagicMock()
+    mock_run.run_id = "run-local"
+    mock_tracker.start_run.return_value.__enter__ = MagicMock(return_value=mock_run)
+    mock_tracker.start_run.return_value.__exit__ = MagicMock(return_value=None)
+
     orchestrator = RetrainingOrchestrator(
         drift_monitor=MagicMock(),
-        experiment_tracker=MagicMock(),
+        experiment_tracker=mock_tracker,
         model_registry=MagicMock(),
         config=RetrainingConfig(),
     )
@@ -104,7 +136,9 @@ def test_trigger_retraining_local_script(tmp_path: Path) -> None:
         reasons=["dataset drift"],
         drift_scores={"share_drifted": 0.5},
         triggered_at=datetime.now(tz=UTC),
+        drift_report_path=tmp_path / "drift.html",
     )
+    decision.drift_report_path.write_text("<html></html>")
 
     with (
         patch("mlops.retraining_orchestrator.TRAIN_SCRIPT", script),

@@ -46,6 +46,7 @@ class DriftMonitor:
         reference_dataset_path: Path,
         feature_columns: list[str],
         reports_dir: Path | None = None,
+        dataset_drift_threshold: float = 0.3,
     ) -> None:
         """Initialize the drift monitor.
 
@@ -53,10 +54,12 @@ class DriftMonitor:
             reference_dataset_path: Path to reference parquet dataset.
             feature_columns: Feature column names for drift analysis.
             reports_dir: Directory for HTML drift reports.
+            dataset_drift_threshold: Share of drifted features for dataset_drift flag.
         """
         self._reference_path = reference_dataset_path
         self._feature_columns = feature_columns
         self._reports_dir = reports_dir or REPORTS_DIR
+        self._dataset_drift_threshold = dataset_drift_threshold
         self._reference_df = pd.read_parquet(reference_dataset_path)
         self._reports_dir.mkdir(parents=True, exist_ok=True)
         logger.info(
@@ -108,7 +111,7 @@ class DriftMonitor:
 
         n_drifted = len(drifted_features)
         share_drifted = n_drifted / max(len(columns), 1)
-        dataset_drift = share_drifted >= 0.3
+        dataset_drift = share_drifted >= self._dataset_drift_threshold
 
         result = DriftReport(
             n_drifted_features=n_drifted,

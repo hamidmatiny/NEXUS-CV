@@ -94,10 +94,13 @@ def create_app() -> FastAPI:
     Returns:
         Configured FastAPI instance with middleware and routes.
     """
+    from serving.mlops_background import mlops_lifespan
+
     app = FastAPI(
         title="NEXUS-CV Serving Gateway",
         version="0.1.0",
         description="Distributed Ray Serve inference API for NEXUS-CV",
+        lifespan=mlops_lifespan,
     )
     app.add_middleware(CircuitBreakerMiddleware)
     app.add_middleware(TimingMiddleware)
