@@ -74,7 +74,12 @@ class YOLODetector:
             Loaded Ultralytics YOLO instance.
         """
         if self._model is None:
-            from ultralytics import YOLO
+            try:
+                from ultralytics import YOLO
+            except ImportError as exc:
+                raise ImportError(
+                    "ultralytics is required for YOLO detection. Install with: pip install ultralytics"
+                ) from exc
 
             resolved = self._resolve_model_path(self._model_path)
             logger.info("yolo_model_loading", model_path=str(resolved))

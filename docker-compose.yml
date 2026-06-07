@@ -25,6 +25,32 @@ services:
       - nexus-net
     restart: unless-stopped
 
+  serving:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.serving
+      target: production
+    env_file:
+      - .env
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - MLOPS_REPORTS_DIR=/app/reports
+      - MLOPS_TEMP_DATA_DIR=/app/data/mlops/current
+      - RECORDING_ENABLED=${RECORDING_ENABLED:-false}
+      - RECORDING_DB_PATH=/app/data/recordings/nexus_cv.db
+    volumes:
+      - ./models:/app/models
+      - ./reports:/app/reports
+      - ./data/recordings:/app/data/recordings
+      - ./data/mlops:/app/data/mlops
+    ports:
+      - "8000:8000"
+    networks:
+      - nexus-net
+    restart: unless-stopped
+    depends_on:
+      - mlflow
+
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.18.0
     command: >

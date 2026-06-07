@@ -1,0 +1,59 @@
+# NEXUS-CV Helm values — all configurable parameters with sensible defaults.
+
+replicaCount: 2
+
+image:
+  repository: nexus-cv/serving
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  httpPort: 8000
+  grpcPort: 50051
+
+resources:
+  requests:
+    cpu: "1"
+    memory: 2Gi
+  limits:
+    cpu: "2"
+    memory: 4Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  # Custom metric: scale when inference queue depth exceeds threshold
+  customMetric:
+    name: nexus_cv_inference_queue_depth
+    targetAverageValue: 50
+
+env:
+  LOG_LEVEL: INFO
+  MLFLOW_TRACKING_URI: http://mlflow:5000
+  MLOPS_RETRAINING_ENABLED: "false"
+  RECORDING_ENABLED: "false"
+
+persistence:
+  reports:
+    enabled: true
+    size: 5Gi
+  recordings:
+    enabled: true
+    size: 2Gi
+
+livenessProbe:
+  path: /health
+  initialDelaySeconds: 30
+  periodSeconds: 15
+
+readinessProbe:
+  path: /health
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+serviceAccount:
+  create: true
+  name: nexus-cv-serving

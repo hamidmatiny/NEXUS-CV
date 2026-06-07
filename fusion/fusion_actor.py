@@ -6,8 +6,24 @@ import math
 from dataclasses import replace
 
 import numpy as np
-import ray
 import structlog
+
+try:
+    import ray
+
+    _ray_remote = ray.remote
+except ImportError:
+    ray = None  # type: ignore[assignment]
+
+    def _ray_remote(*args: object, **kwargs: object) -> object:
+        """No-op Ray remote decorator when Ray is not installed."""
+        if len(args) == 1 and callable(args[0]) and not kwargs:
+            return args[0]
+
+        def _wrap(cls: type) -> type:
+            return cls
+
+        return _wrap
 
 from fusion.data_types import AlignedReading, BBox3D, FusionStats, RadarTarget, Track
 from fusion.kalman_tracker import MultiObjectTracker
@@ -94,7 +110,7 @@ def _nearest_radar_target(
     return None
 
 
-@ray.remote
+@_ray_remote
 class FusionActor:
     """Ray actor orchestrating multi-modal track fusion.
 

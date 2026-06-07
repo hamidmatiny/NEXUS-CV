@@ -96,6 +96,14 @@ class Settings(BaseSettings):
         default=None,
         description="Optional webhook URL for retraining notifications",
     )
+    RECORDING_ENABLED: bool = Field(
+        default=False,
+        description="Persist inference outputs to SQLite for dashboard replay",
+    )
+    RECORDING_DB_PATH: Path = Field(
+        default=Path("./data/recordings/nexus_cv.db"),
+        description="SQLite database path for inference session recording",
+    )
 
 
 @lru_cache

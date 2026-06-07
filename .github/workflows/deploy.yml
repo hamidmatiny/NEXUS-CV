@@ -1,0 +1,50 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker --quiet
+
+      - name: Build and push image
+        env:
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          SHA: ${{ github.sha }}
+        run: |
+          IMAGE=gcr.io/${PROJECT_ID}/nexus-cv:${SHA}
+          docker build --target production -f docker/Dockerfile.serving -t ${IMAGE} .
+          docker push ${IMAGE}
+
+      - name: Deploy to Cloud Run
+        env:
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          SHA: ${{ github.sha }}
+          REGION: us-central1
+        run: |
+          gcloud run deploy nexus-cv-serving \
+            --image gcr.io/${PROJECT_ID}/nexus-cv:${SHA} \
+            --region ${REGION} \
+            --platform managed \
+            --min-instances 1 \
+            --max-instances 10 \
+            --cpu 2 \
+            --memory 4Gi \
+            --concurrency 80 \
+            --allow-unauthenticated

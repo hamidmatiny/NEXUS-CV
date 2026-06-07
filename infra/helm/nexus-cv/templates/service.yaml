@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nexus-cv.fullname" . }}
+  labels:
+    app.kubernetes.io/name: nexus-cv
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app.kubernetes.io/name: nexus-cv
+  ports:
+    - name: http
+      port: {{ .Values.service.httpPort }}
+      targetPort: http
+    - name: grpc
+      port: {{ .Values.service.grpcPort }}
+      targetPort: grpc

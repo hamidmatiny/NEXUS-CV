@@ -12,3 +12,9 @@ scrape_configs:
     static_configs:
       - targets:
           - ingestion:8001
+
+  - job_name: nexus-cv-serving
+    static_configs:
+      - targets:
+          - serving:8000
+    metrics_path: /metrics

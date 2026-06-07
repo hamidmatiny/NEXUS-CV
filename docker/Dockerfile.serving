@@ -1,0 +1,29 @@
+FROM python:3.12-slim AS base
+
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+FROM base AS production
+
+COPY config/ config/
+COPY ingestion/ ingestion/
+COPY fusion/ fusion/
+COPY intelligence/ intelligence/
+COPY serving/ serving/
+COPY mlops/ mlops/
+COPY dashboard/ dashboard/
+COPY proto/ proto/
+COPY models/ models/
+COPY scripts/ scripts/
+
+RUN mkdir -p /app/reports /app/data/recordings /app/data/mlops/current /app/models/cache
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+EXPOSE 8000 50051
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+
+CMD ["python", "-c", "from serving.deployments import get_shared_pipeline; from serving.gateway import app, configure_pipeline; import uvicorn; configure_pipeline(get_shared_pipeline().remote); uvicorn.run(app, host='0.0.0.0', port=8000)"]

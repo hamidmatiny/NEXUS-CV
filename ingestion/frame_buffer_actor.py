@@ -6,7 +6,22 @@ from collections import deque
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-import ray
+try:
+    import ray
+
+    _ray_remote = ray.remote
+except ImportError:
+    ray = None  # type: ignore[assignment]
+
+    def _ray_remote(*args: object, **kwargs: object) -> object:
+        """No-op Ray remote decorator when Ray is not installed."""
+        if len(args) == 1 and callable(args[0]) and not kwargs:
+            return args[0]
+
+        def _wrap(cls: type) -> type:
+            return cls
+
+        return _wrap
 import structlog
 
 from config.settings import get_settings
@@ -34,7 +49,7 @@ class BufferedFrame:
     detection_latency_ms: float
 
 
-@ray.remote
+@_ray_remote
 class FrameBufferActor:
     """Ray actor that maintains bounded deques of buffered frames per camera.
 

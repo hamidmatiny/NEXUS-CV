@@ -74,7 +74,7 @@ async def _run_pipeline(request: InferenceRequest) -> InferenceResponse:
 
         scene = ScenePrediction(scene_class="unknown", confidence=0.0, top3=[("unknown", 0.0)])
 
-    return build_inference_response(
+    response = build_inference_response(
         request_id=request_id,
         camera_id=request.camera_id,
         timestamp_ns=request.timestamp_ns,
@@ -86,6 +86,39 @@ async def _run_pipeline(request: InferenceRequest) -> InferenceResponse:
         inference_ms=inference_ms,
         serving_ms=serving_ms,
     )
+
+    await _publish_dashboard_update(request, response, result)
+    return response
+
+
+async def _publish_dashboard_update(
+    request: InferenceRequest,
+    response: InferenceResponse,
+    result: Any,
+) -> None:
+    """Broadcast dashboard payload and optionally record for replay.
+
+    Args:
+        request: Original inference request.
+        response: Built inference response.
+        result: Raw pipeline result for track counts.
+    """
+    from dashboard.backend.metrics_snapshot import build_live_metrics
+    from dashboard.backend.recording_store import maybe_record_inference
+    from dashboard.backend.ws_streamer import broadcast_inference, build_dashboard_payload
+
+    anomaly_count = sum(1 for a in response.anomalies if a.is_anomalous)
+    metrics = build_live_metrics(
+        inference_ms=response.inference_ms,
+        active_tracks=len(result.tracks),
+    )
+    if response.anomalies:
+        metrics["anomaly_rate"] = anomaly_count / max(len(response.anomalies), 1)
+
+    response_dict = response.model_dump()
+    payload = build_dashboard_payload(response_dict, request.frame_b64, metrics)
+    await broadcast_inference(request.camera_id, payload)
+    maybe_record_inference(request.camera_id, request.timestamp_ns, payload)
 
 
 def create_app() -> FastAPI:
@@ -105,6 +138,12 @@ def create_app() -> FastAPI:
     app.add_middleware(CircuitBreakerMiddleware)
     app.add_middleware(TimingMiddleware)
     app.add_middleware(CorrelationIDMiddleware)
+
+    from dashboard.backend.replay_api import router as replay_router
+    from dashboard.backend.ws_streamer import router as dashboard_router
+
+    app.include_router(replay_router)
+    app.include_router(dashboard_router)
 
     @app.get("/health")
     async def health() -> Response:
