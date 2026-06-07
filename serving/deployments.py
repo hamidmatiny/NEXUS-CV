@@ -32,17 +32,31 @@ except ImportError:
 def decode_frame(frame_b64: str) -> NDArray[np.uint8]:
     """Decode a base64-encoded JPEG/PNG frame to BGR numpy array.
 
+    On decode failure, logs a warning and returns a blank 640x480 BGR frame
+    so bad or mock payloads do not crash the serving gateway.
+
     Args:
         frame_b64: Base64-encoded image bytes.
 
     Returns:
         BGR image array.
     """
-    raw = base64.b64decode(frame_b64)
-    arr = np.frombuffer(raw, dtype=np.uint8)
-    frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    fallback = np.zeros((480, 640, 3), dtype=np.uint8)
+    try:
+        raw = base64.b64decode(frame_b64)
+        arr = np.frombuffer(raw, dtype=np.uint8)
+        frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    except Exception as exc:
+        logger.warning("frame_decode_failed", error=str(exc), fallback_shape=fallback.shape)
+        return fallback
+
     if frame is None:
-        raise ValueError("Failed to decode frame_b64 payload")
+        logger.warning(
+            "frame_decode_failed",
+            reason="cv2.imdecode returned None",
+            fallback_shape=fallback.shape,
+        )
+        return fallback
     return frame
 
 
