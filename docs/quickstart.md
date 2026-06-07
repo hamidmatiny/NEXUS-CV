@@ -4,7 +4,7 @@
 
 - Docker Desktop (or Docker Engine + Compose v2)
 - 8 GB RAM minimum
-- Ports available: 8000, 3000, 9090, 5001
+- Ports available: 8000, 8001, 3000, 9090, 5001
 
 ## Steps
 
@@ -32,8 +32,10 @@ This starts:
 ### 3. Verify health
 
 ```bash
-curl http://localhost:8000/health | jq .
+curl http://localhost:8000/health | jq .    # serving gateway
+curl http://localhost:8001/health | jq .    # ingestion metrics API
 curl http://localhost:8000/metrics | head
+curl http://localhost:8001/metrics | grep nexus_cv_frames
 ```
 
 ### 4. Run inference
@@ -89,11 +91,7 @@ pytest tests/ -v
 Start serving locally:
 
 ```bash
-python -c "
-from serving.deployments import get_shared_pipeline
-from serving.gateway import app, configure_pipeline
-import uvicorn
-configure_pipeline(get_shared_pipeline().remote)
-uvicorn.run(app, host='0.0.0.0', port=8000)
-"
+python scripts/run_serving.py
 ```
+
+Further reading: [architecture.md](architecture.md) · [business_case.md](business_case.md) · [BENCHMARKS.md](../BENCHMARKS.md)
