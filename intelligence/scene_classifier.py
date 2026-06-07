@@ -115,8 +115,12 @@ class SceneClassifier:
         if self._pipeline is None:
             return self._mock_prediction()
 
-        rgb = frame[:, :, ::-1]
-        results: list[dict[str, object]] = self._pipeline(rgb, top_k=5)  # type: ignore[operator]
+        import cv2
+        from PIL import Image as PILImage
+
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        pil_image = PILImage.fromarray(rgb)
+        results: list[dict[str, object]] = self._pipeline(pil_image, top_k=5)  # type: ignore[operator]
 
         scene_scores: dict[str, float] = {cls: 0.0 for cls in SCENE_CLASSES}
         for item in results:

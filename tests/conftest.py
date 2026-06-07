@@ -56,6 +56,7 @@ def _override_settings(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr("ingestion.frame_buffer_actor.get_settings", lambda: settings)
     monkeypatch.setattr("ingestion.yolo_detector.get_settings", lambda: settings)
     monkeypatch.setattr("ingestion.schema_contracts.get_settings", lambda: settings)
+    monkeypatch.setattr("serving.health.get_settings", lambda: settings)
 
 
 @pytest.fixture

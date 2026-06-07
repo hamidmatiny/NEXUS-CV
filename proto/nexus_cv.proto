@@ -1,0 +1,96 @@
+// NEXUS-CV gRPC API definitions mirroring the FastAPI serving schemas.
+
+syntax = "proto3";
+
+package nexus_cv;
+
+// NexusCVService provides bidirectional streaming inference over gRPC.
+service NexusCVService {
+  // StreamInference accepts a stream of frame requests and returns
+  // a stream of inference responses in real time.
+  rpc StreamInference(stream InferenceRequest) returns (stream InferenceResponse);
+}
+
+// InferenceRequest mirrors the Pydantic InferenceRequest schema.
+message InferenceRequest {
+  string camera_id = 1;    // Source camera identifier (e.g. "cam_00")
+  string frame_b64 = 2;    // Base64-encoded JPEG/PNG frame payload
+  int64 timestamp_ns = 3;  // Capture timestamp in nanoseconds since epoch
+}
+
+// Bounding box detection result.
+message Detection {
+  repeated float bbox_xyxy = 1;  // [x1, y1, x2, y2] pixel coordinates
+  float confidence = 2;            // Detection confidence in [0, 1]
+  int32 class_id = 3;              // COCO class identifier
+  string class_name = 4;           // Human-readable class label
+  optional int32 track_id = 5;     // Optional tracker assignment
+}
+
+// 3D bounding box for fused LiDAR clusters.
+message BBox3D {
+  repeated float center_xyz = 1;      // [x, y, z] in meters
+  repeated float dimensions_lwh = 2;  // [length, width, height] in meters
+  float yaw_rad = 3;                  // Heading angle in radians
+  float confidence = 4;               // Fusion confidence in [0, 1]
+}
+
+// Fused multi-modal track.
+message Track {
+  string track_id = 1;
+  string state = 2;                   // tentative | confirmed | lost | dead
+  int32 age_frames = 3;
+  repeated string modalities_seen = 4;
+  repeated float last_bbox_2d = 5;      // [x1, y1, x2, y2] or empty
+  optional BBox3D last_bbox_3d = 6;
+  repeated float velocity_2d = 7;       // [vx, vy] pixels per frame
+  map<string, int32> class_votes = 8;
+  float anomaly_score = 9;
+}
+
+// Scene classification result.
+message ScenePrediction {
+  string scene_class = 1;
+  float confidence = 2;
+  repeated SceneClassScore top3 = 3;
+}
+
+message SceneClassScore {
+  string class_name = 1;
+  float score = 2;
+}
+
+// Per-track anomaly assessment.
+message AnomalyScore {
+  string track_id = 1;
+  float score = 2;                        // Combined score in [0, 1]
+  repeated string contributing_factors = 3;
+  bool is_anomalous = 4;
+}
+
+// Predicted future trajectory.
+message Trajectory {
+  string track_id = 1;
+  repeated Position2D predicted_positions = 2;
+  int32 horizon_frames = 3;
+  float confidence = 4;
+}
+
+message Position2D {
+  float x = 1;
+  float y = 2;
+}
+
+// InferenceResponse mirrors the Pydantic InferenceResponse schema.
+message InferenceResponse {
+  string request_id = 1;              // UUID correlation identifier
+  string camera_id = 2;
+  int64 timestamp_ns = 3;
+  repeated Detection detections = 4;
+  repeated Track tracks = 5;
+  ScenePrediction scene = 6;
+  repeated AnomalyScore anomalies = 7;
+  repeated Trajectory trajectories = 8;
+  float inference_ms = 9;             // Total pipeline inference latency
+  float serving_ms = 10;              // End-to-end serving latency
+}
